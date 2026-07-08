@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SLOOM 맞춤 추천</title>
+<style>
+  /* ── 기본 리셋 ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── 디자인 토큰 ── */
+  :root {
+    --c-bg: #F7F5F2;
+    --c-surface: #FFFFFF;
+    --c-border: #E8E4DF;
+    --c-border-strong: #D0CBC4;
+    --c-text: #1A1714;
+    --c-text-sub: #6B6460;
+    --c-text-muted: #A09890;
+    --c-accent: #3B6EA5;
+    --c-accent-bg: #EBF2FA;
+    --c-accent-text: #1E4D7A;
+    --c-selected-bg: #EBF2FA;
+    --c-selected-border: #3B6EA5;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--c-bg);
+    color: var(--c-text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 48px 20px 80px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* ── 헤더 ── */
+  .quiz-header {
+    margin-bottom: 36px;
+  }
+  .brand-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--c-accent-text);
+    background: var(--c-accent-bg);
+    padding: 5px 10px;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .quiz-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--c-text);
+    margin-bottom: 8px;
+  }
+  .quiz-header p {
+    font-size: 14px;
+    color: var(--c-text-sub);
+    line-height: 1.6;
+  }
+
+  /* ── 진행 표시 ── */
+  .progress-track {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .progress-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--c-border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--c-accent);
+    border-radius: 2px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .progress-label {
+    font-size: 12px;
+    color: var(--c-text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── 질문 카드 ── */
+  .step { display: none; }
+  .step.active { display: block; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .q-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--c-text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .q-text {
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--c-text);
+    line-height: 1.45;
+    margin-bottom: 20px;
+  }
+
+  /* ── 선택지 ── */
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .opt:hover {
+    border-color: var(--c-border-strong);
+    background: #FDFCFB;
+  }
+  .opt.selected {
+    border-color: var(--c-selected-border);
+    background: var(--c-selected-bg);
+  }
+  .opt:active { transform: scale(0.99); }
+  .opt-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--c-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .opt.selected .opt-icon {
+    background: var(--c-accent-bg);
+  }
+  .opt-text {
+    font-size: 14px;
+    color: var(--c-text);
+    line-height: 1.5;
+  }
+  .opt.selected .opt-text {
+    color: var(--c-accent-text);
+    font-weight: 500;
+  }
+
+  /* ── 버튼 영역 ── */
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+    gap: 10px;
+  }
+  .btn {
+    height: 44px;
+    padding: 0 22px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    border: 1px solid var(--c-border-strong);
+    background: var(--c-surface);
+    color: var(--c-text-sub);
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn:hover { background: var(--c-bg); }
+  .btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+  .btn.primary {
+    background: var(--c-accent);
+    color: #fff;
+    border-color: var(--c-accent);
+    padding: 0 28px;
+  }
+  .btn.primary:hover { background: #2E5A8A; border-color: #2E5A8A; }
+
+  /* ── 로딩 ── */
+  .loading-wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 72px 20px;
+    text-align: center;
+  }
+  .loading-wrap.active { display: flex; }
+  .loading-ring {
+    width: 36px;
+    height: 36px;
+    border: 2.5px solid var(--c-border);
+    border-top-color: var(--c-accent);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--c-text-muted); }
+
+  /* ── 결과 화면 ── */
+  .result-wrap { display: none; }
+  .result-wrap.active { display: block; animation: fadeIn 0.3s ease; }
+
+  .result-intro {
+    margin-bottom: 20px;
+  }
+  .result-intro .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--c-accent-text);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .result-intro h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--c-text);
+  }
+
+  .main-card {
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    margin-bottom: 12px;
+  }
+  .main-card .rec-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--c-accent-text);
+    background: var(--c-accent-bg);
+    padding: 4px 10px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .main-card .product-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--c-text);
+    margin-bottom: 10px;
+  }
+  .main-card .product-reason {
+    font-size: 14px;
+    color: var(--c-text-sub);
+    line-height: 1.75;
+    margin-bottom: 18px;
+  }
+  .buy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 42px;
+    padding: 0 20px;
+    background: var(--c-accent);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    font-family: var(--font);
+    transition: background 0.15s;
+  }
+  .buy-btn:hover { background: #2E5A8A; }
+
+  .alt-section { margin-top: 8px; }
+  .alt-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--c-text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .alt-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--c-surface);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .alt-card:hover { border-color: var(--c-border-strong); background: #FDFCFB; }
+  .alt-card-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--c-text);
+    margin-bottom: 3px;
+  }
+  .alt-card-reason {
+    font-size: 12px;
+    color: var(--c-text-muted);
+    line-height: 1.5;
+  }
+  .alt-arrow {
+    font-size: 16px;
+    color: var(--c-text-muted);
+    flex-shrink: 0;
+    margin-left: 12px;
+  }
+
+  .restart-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    margin-top: 20px;
+    height: 42px;
+    background: transparent;
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--c-text-muted);
+    cursor: pointer;
+    font-family: var(--font);
+    transition: background 0.15s, color 0.15s;
+  }
+  .restart-btn:hover { background: var(--c-surface); color: var(--c-text-sub); }
+
+  /* ── 에러 ── */
+  .error-box {
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #B91C1C;
+    line-height: 1.6;
+    display: none;
+  }
+  .error-box.active { display: block; }
+
+  @media (max-width: 480px) {
+    body { padding: 32px 16px 60px; }
+    .quiz-header h1 { font-size: 22px; }
+    .q-text { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ██████╗  관리자 설정 영역  ██████╗
+     아래 CONFIG 객체만 수정하세요.
+     고객에게는 이 영역이 노출되지 않습니다.
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+
+  /* ── 브랜드 표시 ── */
+  brand: "SLOOM",
+  hero_title: "나에게 꼭 맞는\n마사지 기기를 찾아드릴게요",
+  hero_desc: "몇 가지 질문에 답하면 AI가 내 생활 패턴에 가장 잘 맞는 제품을 추천해드려요.",
+
+  /* ── 설문 질문 ── */
+  questions: [
+    {
+      text: "어디가 주로 불편하거나 피로한가요?",
+      options: [
+        { icon: "💆", label: "목, 어깨가 자주 뭉치고 뻐근해요",   value: "목/어깨 통증" },
+        { icon: "🦴", label: "허리가 아프거나 무거워요",           value: "허리 통증/요통" },
+        { icon: "🦶", label: "발, 다리가 붓고 피로해요",           value: "발/다리 부종·피로" },
+        { icon: "🔄", label: "골반, 엉덩이 주변이 불편해요",       value: "골반·엉덩이 불편" },
+        { icon: "😓", label: "전신이 다 피로해요",                  value: "전신 피로" }
+      ]
+    },
+    {
+      text: "주로 어떤 환경에서 시간을 보내시나요?",
+      options: [
+        { icon: "💻", label: "하루 대부분을 책상 앞에 앉아 있어요", value: "하루 종일 좌식 근무" },
+        { icon: "🏪", label: "서서 일하거나 많이 걸어요",           value: "장시간 기립·보행" },
+        { icon: "🚗", label: "운전을 오래 해요",                    value: "장거리 운전" },
+        { icon: "🏠", label: "주로 집에서 지내요",                  value: "재택·가정 생활 중심" }
+      ]
+    },
+    {
+      text: "마사지는 주로 언제 사용할 것 같으세요?",
+      options: [
+        { icon: "🌙", label: "잠들기 전, 침대에서",      value: "취침 전 사용" },
+        { icon: "⏱", label: "일하는 중간중간",           value: "업무 중 틈틈이" },
+        { icon: "🛋", label: "집에서 쉬는 시간에",       value: "여가 시간" },
+        { icon: "🚌", label: "이동 중에도 쓰고 싶어요",  value: "이동 중 휴대 사용" }
+      ]
+    },
+    {
+      text: "평소 어떤 증상이 가장 신경 쓰이나요?",
+      options: [
+        { icon: "😴", label: "잠을 잘 못 자거나 목이 자고 나서도 불편해요", value: "수면 질 저하·기상 후 목 불편" },
+        { icon: "💧", label: "다리, 발이 퉁퉁 붓는 편이에요",              value: "하지 부종" },
+        { icon: "⚡", label: "앉아 있으면 허리가 금방 아파요",             value: "좌식 요통" },
+        { icon: "↔️", label: "골반이 틀어졌거나 좌우 균형이 안 맞아요",   value: "골반 불균형" }
+      ]
+    },
+    {
+      text: "기기를 사용하면서 중요하게 생각하는 것은?",
+      options: [
+        { icon: "🔌", label: "충전 없이 편하게 쓸 수 있어야 해요",  value: "사용 편의성 우선" },
+        { icon: "💪", label: "자극이 강하고 시원해야 해요",          value: "강한 마사지 강도" },
+        { icon: "🎒", label: "가볍고 들고 다닐 수 있어야 해요",      value: "휴대성" },
+        { icon: "✨", label: "집에 두어도 예쁜 디자인이 좋아요",     value: "인테리어 친화 디자인" }
+      ]
+    },
+    {
+      text: "마사지 기기를 구매한 경험이 있나요?",
+      options: [
+        { icon: "🌱", label: "처음 구매해보는 거예요",               value: "첫 구매" },
+        { icon: "👍", label: "써본 적 있는데 더 좋은 게 필요해요",   value: "기존 기기 불만족" },
+        { icon: "📦", label: "여러 개 갖고 있고 부위별로 갖추고 싶어요", value: "부위별 추가 구매" }
+      ]
+    }
+  ],
+
+  /* ── SLOOM 제품 정보 ──
+     AI가 추천 이유를 생성할 때 이 정보를 참고합니다.
+     name      : 제품명 (AI 출력에 그대로 노출됩니다)
+     desc      : 제품 설명 (AI 프롬프트에 전달)
+     link      : 구매/상세 페이지 URL
+     link_label: 버튼 텍스트
+  ── */
+  products: [
+    {
+      name: "목마사지베개 V2",
+      desc: "목/어깨 전용, 취침 중 또는 쉬면서 사용, 경추 지지+진동 마사지, 코드리스 편의성, 수면 개선 효과",
+      link: "https://olit.co.kr/products/neck-pillow-v2",
+      link_label: "제품 보러가기"
+    },
+    {
+      name: "허리편한케어 V2",
+      desc: "요통/좌골신경통 완화, 앉은 자세에서 사용, 허리 지지대+진동, 직장인·운전자에게 최적, 높이 조절 가능",
+      link: "https://olit.co.kr/products/back-care-v2",
+      link_label: "제품 보러가기"
+    },
+    {
+      name: "발편한케어",
+      desc: "발/종아리 부종 완화, 지압+온열 기능, 저녁에 발 올려놓고 사용, 서서 일하는 직업군에 효과적, 혈액순환 개선",
+      link: "https://olit.co.kr/products/foot-care",
+      link_label: "제품 보러가기"
+    },
+    {
+      name: "골반마사지기",
+      desc: "골반 교정·균형, 코어 강화, 좌식 생활자·산후여성 대상, 복부·엉덩이 근육 이완",
+      link: "https://olit.co.kr/products/pelvis-massager",
+      link_label: "제품 보러가기"
+    }
+  ],
+
+  /* ── AI 추천 설정 ── */
+  ai_intro: "답변을 분석하고 있어요...",
+  result_title: "추천 결과",
+  result_subtitle: "고객님께 딱 맞는 제품을 골랐어요"
+};
+</script>
+<!-- ════════════════════════════════════════════════════════════════
+     관리자 설정 끝  —  아래는 수정하지 마세요
+     ════════════════════════════════════════════════════════════════ -->
+
+<div class="container" id="app">
+
+  <!-- 헤더 -->
+  <div class="quiz-header">
+    <div class="brand-tag" id="brand-tag"></div>
+    <h1 id="hero-title"></h1>
+    <p id="hero-desc"></p>
+  </div>
+
+  <!-- 설문 섹션 -->
+  <div id="quiz-section">
+    <div class="progress-track">
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <span class="progress-label" id="progress-label"></span>
+    </div>
+    <div id="steps-container"></div>
+    <div class="error-box" id="error-box"></div>
+    <div class="nav">
+      <button class="btn" id="prev-btn">← 이전</button>
+      <button class="btn primary" id="next-btn" disabled>다음 →</button>
+    </div>
+  </div>
+
+  <!-- 로딩 -->
+  <div class="loading-wrap" id="loading-wrap">
+    <div class="loading-ring"></div>
+    <p class="loading-text" id="loading-text"></p>
+  </div>
+
+  <!-- 결과 -->
+  <div class="result-wrap" id="result-wrap">
+    <div class="result-intro">
+      <p class="eyebrow" id="result-eyebrow"></p>
+      <h2 id="result-subtitle-el"></h2>
+    </div>
+    <div class="main-card" id="main-card"></div>
+    <div class="alt-section" id="alt-section"></div>
+    <button class="restart-btn" id="restart-btn">↺ 처음부터 다시 하기</button>
+  </div>
+
+</div>
+
+<script>
+/* ── 상태 ── */
+let step = 0;
+let answers = [];
+
+/* ── DOM 캐시 ── */
+const quizSection   = document.getElementById('quiz-section');
+const loadingWrap   = document.getElementById('loading-wrap');
+const resultWrap    = document.getElementById('result-wrap');
+const stepsContainer= document.getElementById('steps-container');
+const progressFill  = document.getElementById('progress-fill');
+const progressLabel = document.getElementById('progress-label');
+const prevBtn       = document.getElementById('prev-btn');
+const nextBtn       = document.getElementById('next-btn');
+const errorBox      = document.getElementById('error-box');
+
+/* ── 초기화: CONFIG → DOM ── */
+function init() {
+  document.title = CONFIG.brand + ' 맞춤 추천';
+  document.getElementById('brand-tag').textContent       = CONFIG.brand + ' 맞춤 추천';
+  document.getElementById('hero-title').textContent      = CONFIG.hero_title.replace(/\\n/g, '\n');
+  document.getElementById('hero-title').style.whiteSpace = 'pre-line';
+  document.getElementById('hero-desc').textContent       = CONFIG.hero_desc;
+  document.getElementById('loading-text').textContent    = CONFIG.ai_intro;
+  document.getElementById('result-eyebrow').textContent  = CONFIG.result_title;
+  document.getElementById('result-subtitle-el').textContent = CONFIG.result_subtitle;
+
+  buildSteps();
+  showStep();
+  prevBtn.addEventListener('click', goPrev);
+  nextBtn.addEventListener('click', goNext);
+  document.getElementById('restart-btn').addEventListener('click', restart);
+}
+
+/* ── 설문 단계 빌드 ── */
+function buildSteps() {
+  CONFIG.questions.forEach((q, qi) => {
+    const div = document.createElement('div');
+    div.className = 'step';
+    div.dataset.step = qi;
+
+    let html = `<p class="q-eyebrow">질문 ${qi + 1} / ${CONFIG.questions.length}</p>`;
+    html += `<p class="q-text">${escHtml(q.text)}</p>`;
+    html += `<div class="options">`;
+    q.options.forEach((opt, oi) => {
+      html += `<div class="opt" data-qi="${qi}" data-oi="${oi}">
+        <div class="opt-icon">${opt.icon}</div>
+        <div class="opt-text">${escHtml(opt.label)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    div.innerHTML = html;
+    stepsContainer.appendChild(div);
+
+    div.querySelectorAll('.opt').forEach(el => {
+      el.addEventListener('click', () => selectOpt(qi, oi = +el.dataset.oi, el));
+    });
+  });
+}
+
+function selectOpt(qi, oi, el) {
+  const allOpts = stepsContainer.querySelectorAll(`.opt[data-qi="${qi}"]`);
+  allOpts.forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  answers[qi] = CONFIG.questions[qi].options[oi].value;
+  nextBtn.disabled = false;
+  errorBox.classList.remove('active');
+}
+
+/* ── 네비게이션 ── */
+function showStep() {
+  stepsContainer.querySelectorAll('.step').forEach((s, i) => {
+    s.classList.toggle('active', i === step);
+  });
+  const total = CONFIG.questions.length;
+  progressFill.style.width = ((step + 1) / total * 100) + '%';
+  progressLabel.textContent = (step + 1) + ' / ' + total;
+  prevBtn.disabled = step === 0;
+  const isLast = step === total - 1;
+  nextBtn.textContent = isLast ? '추천 받기 →' : '다음 →';
+  nextBtn.disabled = answers[step] === undefined;
+  errorBox.classList.remove('active');
+
+  /* 이미 선택된 답변 표시 복원 */
+  if (answers[step] !== undefined) {
+    const q = CONFIG.questions[step];
+    q.options.forEach((opt, oi) => {
+      if (opt.value === answers[step]) {
+        const el = stepsContainer.querySelector(`.opt[data-qi="${step}"][data-oi="${oi}"]`);
+        if (el) el.classList.add('selected');
+      }
+    });
+  }
+}
+
+function goPrev() {
+  if (step > 0) { step--; showStep(); }
+}
+
+function goNext() {
+  if (answers[step] === undefined) {
+    showError('항목을 선택해주세요.');
+    return;
+  }
+  if (step < CONFIG.questions.length - 1) {
+    step++;
+    showStep();
+  } else {
+    getRecommendation();
+  }
+}
+
+/* ── AI 추천 ── */
+async function getRecommendation() {
+  quizSection.style.display = 'none';
+  loadingWrap.classList.add('active');
+
+  const productList = CONFIG.products.map((p, i) =>
+    `${i + 1}. ${p.name} — ${p.desc}`
+  ).join('\n');
+
+  const answerList = CONFIG.questions.map((q, i) =>
+    `- ${q.text} → ${answers[i] || '(미응답)'}`
+  ).join('\n');
+
+  const prompt = `당신은 SLOOM 헬스케어 브랜드의 제품 추천 전문가입니다.
+
+[SLOOM 제품 라인업]
+${productList}
+
+[고객 설문 답변]
+${answerList}
+
+위 답변을 분석해서 가장 적합한 제품 1개를 메인으로 추천하고, 추가로 고려할 제품을 1~2개 제안해주세요.
+메인 추천 이유는 고객의 답변을 반영해 구체적으로 2~3문장으로 작성하세요.
+대안 제품의 이유는 한 문장으로 간결하게 작성하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요 (마크다운 코드블록, 전처리 텍스트 없이 순수 JSON만):
+{
+  "main": {
+    "product": "제품명 (위 라인업의 name과 정확히 일치)",
+    "reason": "추천 이유 2~3문장"
+  },
+  "alternatives": [
+    { "product": "제품명", "reason": "한 문장 이유" }
+  ]
+}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!res.ok) throw new Error('API 오류: ' + res.status);
+    const data = await res.json();
+    const raw = data.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    const json = JSON.parse(raw.replace(/^```json\s*/,'').replace(/```\s*$/,''));
+    showResult(json);
+
+  } catch (e) {
+    loadingWrap.classList.remove('active');
+    quizSection.style.display = 'block';
+    showError('추천을 불러오는 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.');
+    console.error(e);
+  }
+}
+
+/* ── 결과 렌더 ── */
+function showResult(data) {
+  loadingWrap.classList.remove('active');
+
+  const mainProd = CONFIG.products.find(p => p.name === data.main.product) || CONFIG.products[0];
+
+  document.getElementById('main-card').innerHTML = `
+    <div class="rec-badge">🎯 맞춤 추천</div>
+    <div class="product-name">${escHtml(data.main.product)}</div>
+    <div class="product-reason">${escHtml(data.main.reason)}</div>
+    <a class="buy-btn" href="${mainProd.link}" target="_blank" rel="noopener">
+      ${escHtml(mainProd.link_label)} ↗
+    </a>
+  `;
+
+  const altSection = document.getElementById('alt-section');
+  if (data.alternatives && data.alternatives.length) {
+    let html = '<p class="alt-label">함께 고려해볼 제품</p>';
+    data.alternatives.forEach(alt => {
+      const altProd = CONFIG.products.find(p => p.name === alt.product) || {};
+      html += `<a class="alt-card" href="${altProd.link || '#'}" target="_blank" rel="noopener">
+        <div>
+          <div class="alt-card-name">${escHtml(alt.product)}</div>
+          <div class="alt-card-reason">${escHtml(alt.reason)}</div>
+        </div>
+        <span class="alt-arrow">→</span>
+      </a>`;
+    });
+    altSection.innerHTML = html;
+  }
+
+  resultWrap.classList.add('active');
+}
+
+/* ── 리셋 ── */
+function restart() {
+  step = 0;
+  answers = [];
+  stepsContainer.querySelectorAll('.opt').forEach(o => o.classList.remove('selected'));
+  resultWrap.classList.remove('active');
+  quizSection.style.display = 'block';
+  showStep();
+}
+
+/* ── 유틸 ── */
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('active');
+}
+
+/* ── 실행 ── */
+init();
+</script>
+</body>
+</html>
