@@ -418,15 +418,15 @@ ${answerList}
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
     });
-    if (!res.ok) throw new Error('서버 오류: ' + res.status);
     const data = await res.json();
+    if (!res.ok) throw new Error('API 오류 ' + res.status + ': ' + JSON.stringify(data));
     const raw  = data.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
     const json = JSON.parse(raw.replace(/^```json\s*/,'').replace(/```\s*$/,''));
     showResult(json);
   } catch(e) {
     loadingWrap.classList.remove('active');
     quizSection.style.display = 'block';
-    showError('추천을 불러오는 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.');
+    showError('오류: ' + e.message);
     console.error(e);
   }
 }
@@ -464,6 +464,11 @@ function restart() {
   resultWrap.classList.remove('active');
   quizSection.style.display = 'block';
   showStep();
+}
+
+function showError(msg) {
+  errorBox.textContent = msg;
+  errorBox.classList.add('active');
 }
 
 function esc(str) {
